@@ -1,0 +1,909 @@
+# Config file for all micros
+
+###########################################################
+##              Mainsail Client variables 
+###########################################################
+
+[gcode_macro _CLIENT_VARIABLE]
+# Pressure Advance macro
+# ...
+# Modified Mainsail macros
+variable_use_custom_pos   : True ; use custom park coordinates for x,y [True/False]
+variable_custom_park_x    : 5.0   ; custom x position; value must be within your defined min and max of X
+variable_custom_park_y    : 225.0   ; custom y position; value must be within your defined min and max of Y
+variable_custom_park_dz   : 2.0   ; custom dz value; the value in mm to lift the nozzle when move to park position
+variable_retract          : 6.0   ; the value to retract while PAUSE
+variable_cancel_retract   : 6.0   ; the value to retract while CANCEL_PRINT
+variable_speed_retract    : 35.0  ; retract speed in mm/s
+variable_unretract        : 4.0   ; the value to unretract while RESUME
+variable_speed_unretract  : 35.0  ; unretract speed in mm/s
+variable_speed_hop        : 5.0  ; z move speed in mm/s
+variable_speed_move       : 50.0 ; move speed in mm/s
+variable_park_at_cancel   : True ; allow to move the toolhead to park while execute CANCEL_PRINT [True/False]
+variable_park_at_cancel_x : None  ; different park position during CANCEL_PRINT [None/Position as Float]; park_at_cancel must be True
+variable_park_at_cancel_y : None  ; different park position during CANCEL_PRINT [None/Position as Float]; park_at_cancel must be True
+# !!! Caution [firmware_retraction] must be defined in the printer.cfg if you set use_fw_retract: True !!!
+variable_use_fw_retract   : False ; use fw_retraction instead of the manual version [True/False]
+variable_idle_timeout     : 3600     ; time in sec until idle_timeout kicks in. Value 0 means that no value will be set or restored #FOR PAUSING PRINT
+#variable_runout_sensor    : ""    ; If a sensor is defined, it will be used to cancel the execution of RESUME in case no filament is detected.
+#                                   Specify the config name of the runout sensor e.g "filament_switch_sensor runout". Hint use the same as in your printer.cfg
+# !!! Custom macros, please use with care and review the section of the corresponding macro.
+# These macros are for simple operations like setting a status LED. Please make sure your macro does not interfere with the basic macro functions.
+# Only  single line commands are supported, please create a macro if you need more than one command.
+variable_user_pause_macro : "USER_PAUSE_ACTIONS"    ; Everything inside the "" will be executed after the klipper base pause (PAUSE_BASE) function #CHECK: see if functional
+variable_user_resume_macro: "USER_RESUME_ACTIONS"    ; Everything inside the "" will be executed before the klipper base resume (RESUME_BASE) function
+#variable_user_cancel_macro: ""    ; Everything inside the "" will be executed before the klipper base cancel (CANCEL_PRINT_BASE) function
+gcode:
+
+###########################################################
+##                   Filament Profile
+###########################################################
+
+[gcode_macro FILAMENT_PROFILE] #CHECK: see if functional
+variable_filament_material: "none"
+variable_filament_diameter: None
+variable_filament_info:
+    {
+        ## ( z-offset, PA-extruder, PA-extruder1 )
+        "PLA"       : ( 0.00, 0.520, 0.488 ), # All placeholder
+        "PLA+"      : ( 0.00, 0.520, 0.488 ), #
+        "PETG"      : ( 0.02, 0.748, 0.748), # PA-extruder1 placeholder
+        "TPU-95A"   : ( 0.00, 0.748, 0.748 ), # All placeholder
+    }
+gcode:
+    {% set FILAMENT_MATERIAL = params.FILAMENT_MATERIAL|default("none")|upper|string %}
+    {% set FILAMENT_DIAMETER = params.FILAMENT_DIAMETER|default(0.00)|float %}
+    SET_GCODE_VARIABLE MACRO=FILAMENT_PROFILE VARIABLE=filament_material VALUE="'{FILAMENT_MATERIAL}'"
+    SET_GCODE_VARIABLE MACRO=FILAMENT_PROFILE VARIABLE=filament_diameter VALUE={FILAMENT_DIAMETER}
+    #{% if FILAMENT_DIAMETER == 0.00 %}
+      #RESPOND TYPE=error MSG="-----Filament diameter not set-----"
+    #{% endif %}
+    RESPOND MSG="Filament profile material set to {FILAMENT_MATERIAL}"
+
+###########################################################
+##              Pressure Advance Adjustment
+###########################################################
+
+[gcode_macro PA_ADJUST]
+gcode:
+    {% if printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA+" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder ADVANCE=0.520
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA+" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder1 ADVANCE=0.488
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+      RESPOND TYPE=error MSG="-----Filament Pressure Advance not calibrated. Defaulting to PLA+ T0 Pressure Advance value-----"
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder ADVANCE=0.52
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+      RESPOND TYPE=error MSG="-----Filament Pressure Advance not calibrated. Defaulting to PLA+ T0 Pressure Advance value-----"
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder1 ADVANCE=0.52
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PETG" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder ADVANCE=0.748
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PETG" and printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+      RESPOND TYPE=error MSG="-----Filament Pressure Advance not calibrated. Defaulting to PETG T0 Pressure Advance value-----"
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder1 ADVANCE=0.748
+    {% else %}
+      RESPOND TYPE=error MSG="-----Filament material not set or unknown. Defaulting to PLA+ T0 Pressure Advance value-----"
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder ADVANCE=0.52
+      SET_PRESSURE_ADVANCE EXTRUDER=extruder1 ADVANCE=0.52
+    {% endif %}
+
+[gcode_macro SET_PRESSURE_ADVANCE]
+description: Replaces built-in macro for SET_PRESSURE_ADVANCE with better active extruder logic
+rename_existing: SET_PRESSURE_ADVANCE_BASE
+gcode:
+    {% set EXTRUDER = params.EXTRUDER|default("none")|string %}
+    {% set ADVANCE = params.ADVANCE|default(10)|float %}
+    {% set SMOOTH_TIME = params.SMOOTH_TIME|default(10)|float %}
+    {% if EXTRUDER == "none" %}
+      {% if printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+        {% if ADVANCE != 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder ADVANCE={ADVANCE} SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE == 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE != 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder ADVANCE={ADVANCE}
+        {% elif ADVANCE == 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder
+        {% endif %}
+      {% elif printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+        {% if ADVANCE != 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder1 ADVANCE={ADVANCE} SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE == 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder1 SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE != 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder1 ADVANCE={ADVANCE}
+        {% elif ADVANCE == 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER=extruder1
+        {% endif %}
+      {% endif %}
+    {% else %}
+      {% if ADVANCE != 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER={EXTRUDER} ADVANCE={ADVANCE} SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE == 10 and SMOOTH_TIME != 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER={EXTRUDER} SMOOTH_TIME={SMOOTH_TIME}
+        {% elif ADVANCE != 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER={EXTRUDER} ADVANCE={ADVANCE}
+        {% elif ADVANCE == 10 and SMOOTH_TIME == 10 %}
+          SET_PRESSURE_ADVANCE_BASE EXTRUDER={EXTRUDER}
+      {% endif %}
+    {% endif %}
+
+###########################################################
+##                 Z-offset Adjustment
+###########################################################
+
+[gcode_macro Z_OFFSET_ADJUST_VAR]
+variable_filament_z_offset: None
+gcode:
+    {% if printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA+" %}
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE=0.00
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PLA" %}
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE=0.00
+    {% elif printer["gcode_macro FILAMENT_PROFILE"].filament_material == "PETG" %}
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE=0.02
+    {% else %}
+      RESPOND TYPE=error MSG="-----Filament material not set or unknown. Defaulting to Z-offset variable 0.01-----"
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE=0.01
+    {% endif %}
+
+[gcode_macro Z_OFFSET_ADJUST_VAR_V2]
+gcode:
+    {% set MATERIAL = printer["gcode_macro FILAMENT_PROFILE"].filament_material %}
+    {% if MATERIAL in printer["gcode_macro FILAMENT_PROFILE"].filament_info %}
+      {% set (MATERIAL_Z_OFFSET, _, _) = filament_table[MATERIAL]|float %}
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE={MATERIAL_Z_OFFSET}
+      RESPOND PREFIX=🔥 MSG="MATERIAL_Z_OFFSET: {material}"
+    {% else %}
+      RESPOND TYPE=error MSG="-----Filament material not set or unknown. Defaulting to Z-offset variable 0.01-----"
+      SET_GCODE_VARIABLE MACRO=Z_OFFSET_ADJUST_VAR VARIABLE=filament_z_offset VALUE=0.01
+    {% endif %}
+
+[gcode_macro ADJUST_Z_OFFSET]
+gcode:
+    {% set FILAMENT_Z_OFFSET = printer["gcode_macro Z_OFFSET_ADJUST_VAR"].filament_z_offset|float %}
+    SET_GCODE_OFFSET Z_ADJUST={FILAMENT_Z_OFFSET} MOVE=1
+    RESPOND MSG="Z-offset set to {FILAMENT_Z_OFFSET}"
+
+[gcode_macro FIRST_LAYER_Z_OFFSET]
+gcode:
+    {% set FILENAME_FILAMENT = printer["gcode_macro _SET_FILENAME_FILAMENT"].filename_filament_material|string %}
+    {% set FILAMENT_Z_OFFSET = printer["gcode_macro Z_OFFSET_ADJUST_VAR"].filament_z_offset|float %}
+    {% set SLICER = params.SLICER|default("none")|lower|string %}
+    {% if SLICER == "none" %}
+      RESPOND TYPE=error MSG="-----Slicer name not set Defaulting to 'orca'-----"
+      {% set SLICER = "orca"|string %}
+    {% endif %}
+    {% if printer.print_stats.currentlayer == 1 and SLICER == "orca" %}
+      SET_GCODE_OFFSET Z_ADJUST=-{FILAMENT_Z_OFFSET} MOVE=0
+      Z_OFFSET_ADJUST_VAR
+      ADJUST_Z_OFFSET
+    {% elif printer.print_stats.currentlayer == 2 and SLICER == "orca" %}
+      SET_GCODE_OFFSET Z_ADJUST=-{FILAMENT_Z_OFFSET} MOVE=0
+      SET_GCODE_VARIABLE MACRO=FILAMENT_PROFILE VARIABLE=filament_material VALUE="'{FILENAME_FILAMENT}'"
+      Z_OFFSET_ADJUST_VAR
+      ADJUST_Z_OFFSET
+    {% elif printer.print_stats.currentlayer == 0 and SLICER == "cura" %}
+      SET_GCODE_OFFSET Z_ADJUST=-{FILAMENT_Z_OFFSET} MOVE=0
+      Z_OFFSET_ADJUST_VAR
+      ADJUST_Z_OFFSET
+    {% elif printer.print_stats.currentlayer == 1 and SLICER == "cura" %}
+      SET_GCODE_OFFSET Z_ADJUST=-{FILAMENT_Z_OFFSET} MOVE=0
+      SET_GCODE_VARIABLE MACRO=FILAMENT_PROFILE VARIABLE=filament_material VALUE="'{FILENAME_FILAMENT}'"
+      Z_OFFSET_ADJUST_VAR
+      ADJUST_Z_OFFSET
+    {% endif %}
+
+###########################################################
+##              MPC M109 & M190 Replacement 
+###########################################################
+
+[gcode_macro M109] # Wait Hotend Temp
+rename_existing: M109.1
+gcode:
+    {% set s = params.S|float %}
+    M104 {% for p in params %}{'%s%s' % (p, params[p])}{% endfor %}  # Set hotend temp
+    {% if s != 0 %}
+        TEMPERATURE_WAIT SENSOR=extruder MINIMUM={s-2} MAXIMUM={s+5}   # Wait for hotend temp (within n degrees)
+    {% endif %}
+
+[gcode_macro M190] # Wait Bed Temp
+rename_existing: M190.1
+gcode:
+    {% set s = params.S|float %}
+    M140 {% for p in params %}{'%s%s' % (p, params[p])}{% endfor %}   # Set bed temp
+    {% if s != 0 %}
+        TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={s-2} MAXIMUM={s+5}  # Wait for bed temp (within n degrees)
+    {% endif %}
+
+###########################################################
+##                    MPC Material
+###########################################################
+
+
+[gcode_macro SET_MPC_MATERIAL]
+description: Set heater MPC parameters for a given material
+variable_filament_table:
+    ## Update this table to adjust material settings
+    {
+        ## ( density, heat capacity )  # suggested heat capacity range
+        "PLA"       : ( 1.25, 2.20 ),  # 1.80 - 2.20
+        "PLA+"      : ( 1.23, 2.20 ),  # 1.80 - 2.20
+        "PETG"      : ( 1.27, 2.20 ),  # 1.70 - 2.20
+        "PC+ABS"    : ( 1.15, 2.20 ),  # 1.50 - 2.20
+        "ABS"       : ( 1.06, 2.40 ),  # 1.25 - 2.40
+        "ASA"       : ( 1.07, 2.10 ),  # 1.30 - 2.10
+        "PA6"       : ( 1.12, 2.50 ),  # 2.00 - 2.50
+        "PA"        : ( 1.15, 2.50 ),  # 2.00 - 2.50
+        "PC"        : ( 1.20, 1.90 ),  # 1.10 - 1.90
+        "TPU"       : ( 1.21, 2.00 ),  # 1.50 - 2.00
+        "TPU-90A"   : ( 1.15, 2.00 ),  # 1.50 - 2.00
+        "TPU-95A"   : ( 1.21, 2.00 ),  # 1.50 - 2.00
+        "ABS-CF"    : ( 1.11, 2.40 ),  # 1.25 - 2.40
+        "ASA-CF"    : ( 1.11, 2.10 ),  # 1.30 - 2.10
+        "PA6-CF"    : ( 1.19, 2.50 ),  # 2.00 - 2.50
+        "PC+ABS-CF" : ( 1.22, 2.20 ),  # 1.50 - 2.20
+        "PC+CF"     : ( 1.36, 1.90 ),  # 1.10 - 1.90
+        "PLA-CF"    : ( 1.29, 2.20 ),  # 1.80 - 2.20
+        "PETG-CF"   : ( 1.30, 2.20 ),  # 1.70 - 2.20
+    }
+gcode:
+    {% set material = printer["gcode_macro FILAMENT_PROFILE"].filament_material %}
+    {% set heater = params.HEATER | default('extruder') %}
+    {% set extruder_config = printer.configfile.settings[heater] %}
+    {% if material in filament_table %}
+        {% set (density, heat_capacity) = filament_table[material] %}
+        RESPOND PREFIX=🔥 MSG="Configured {heater} MPC for {material}. Density: {density}, Heat Capacity: {heat_capacity}"
+    {% else %}
+        {% set density = extruder_config.filament_density %}
+        {% set heat_capacity=extruder_config.filament_heat_capacity %}
+        RESPOND PREFIX=🔥 MSG="Unknown material '{material}', using default mpc parameters for {heater}"
+    {% endif %}
+    MPC_SET HEATER={heater} FILAMENT_DENSITY={density} FILAMENT_HEAT_CAPACITY={heat_capacity}
+
+###########################################################
+##                    Start Print 
+###########################################################
+    
+[gcode_macro _SET_FILENAME_FILAMENT]
+variable_filename_filament_material: ""
+gcode:
+    {% set FILENAME = printer.print_stats.filename|string %}
+    {% set FILENAME_PARTS = FILENAME.split('@@') %}
+    {% set FILENAME_FILAMENT = FILENAME_PARTS[1] if FILENAME_PARTS|length > 1 else "" %} # Get second word from filename
+    SET_GCODE_VARIABLE MACRO=FILAMENT_PROFILE VARIABLE=filament_material VALUE="'{FILENAME_FILAMENT}'"
+    SET_GCODE_VARIABLE MACRO=_SET_FILENAME_FILAMENT VARIABLE=filename_filament_material VALUE="'{FILENAME_FILAMENT}'"
+    Z_OFFSET_ADJUST_VAR
+    
+[gcode_macro START_PRINT]
+gcode:
+    RESPOND MSG="Preparing to print"
+    # Set Primary filament name and update z-offset variable
+    _SET_FILENAME_FILAMENT
+    # Set Pressure Advance for current extruder
+    PA_ADJUST
+    # Get skirt enabled status
+    {% set SKIRT_STATUS = params.SKIRT_STATUS|default(1)|float %}
+    # Get first-layer bed-temp from slicer
+    {% set BED_TEMP = params.BED_TEMP|default(60)|float %}
+    # Get first-layer extruder-temp from slicer
+    {% set EXTRUDER_TEMP = params.EXTRUDER_TEMP|default(210)|float %}
+    G90 # Use absolute coordinates
+    G92 E0 ; Reset Extruder
+    M83 # Extruder relative mode
+    RESPOND MSG="Warming up for bed leveling"
+    M104 S150 # Preheat hotend, no wait
+    M190 S{BED_TEMP} ; Heat bed to print temp
+    G28 # Home all axes
+    # Bed Mesh
+    BED_MESH_CLEAR
+    RESPOND MSG="KAMP Adaptive Bed Meshing"
+    BED_MESH_CALIBRATE
+    # Set z-offset
+    ADJUST_Z_OFFSET
+    RESPOND MSG="Clean bed and nozzle"
+    M104 S{EXTRUDER_TEMP} # Preheat hotend to print temp, no wait
+    G0 X2 Y225 Z50 F3000 # Clear Nozzle and Bed
+    M109 S{EXTRUDER_TEMP} # Heat hotend to print temp
+    {% if SKIRT_STATUS == 0 %}
+    RESPOND MSG="KAMP Purge"
+    LINE_PURGE # purge nozzle
+    {% else %}
+    RESPOND MSG="Slicer Skirt Purge"
+    {% endif %}
+    G92 E0 ; Reset Extruder
+    RESPOND MSG="Print Started"
+
+###########################################################
+##                    End Print 
+###########################################################
+
+[gcode_macro FINISH_STAY_ON]
+variable_finish_stay_on: False
+gcode:
+    {% set FINISH_STAY_ON = params.FINISH_STAY_ON|default(True) %}
+    SET_GCODE_VARIABLE MACRO=FINISH_STAY_ON VARIABLE=finish_power_off VALUE={FINISH_STAY_ON}
+
+[gcode_macro END_PRINT]
+gcode:
+    RESPOND MSG="Print finalizing"
+    M400 ;Finish Moves
+    M83 # Extruder relative mode
+    G91 ;Relative positioning
+    G1 E-4.5 F2700 ;Retract a bit
+    {% if printer.toolhead.position.z < 235 %}
+      G1 E-3 Z0.2 F2400 ;Retract and raise Z
+      G1 X5 Y5 F3000 ;Wipe out
+      G1 Z10 ;Raise Z more
+    {% elif printer.toolhead.position.z < 240 %}
+      G1 E-3 Z0.2 F2400 ;Retract and raise Z
+      G1 X5 Y5 F3000 ;Wipe out
+      G1 Z5 ;Raise Z more
+    {% else %}
+      G1 E-3 F2400 ;Retract
+      G1 X5 Y5 F3000 ;Wipe out
+    {% endif %}
+    G90 ;Absolute positioning
+    G1 X0 Y225 ;Present print
+    M106 S0 ;Turn-off fan
+    m107 ;Turn-off fan
+    M104 S0 ;Turn-off hotend
+    M140 S0 ;Turn-off bed
+    M84 X Y E ;Disable all steppers but Z
+    RESPOND MSG="Print Finished"
+    {% if printer["gcode_macro FINISH_STAY_ON"].finish_stay_on == False %}
+      IDLE_TIMEOUT IDLE_TIMEOUT=5
+    {% endif %}
+    
+
+###########################################################
+##                   Tasmota power 
+###########################################################
+
+[gcode_macro POWER_OFF]
+gcode:
+  {action_call_remote_method(
+    "set_device_power", device="tasmota_ender_3_V2", state="off"
+  )}
+
+[gcode_macro POWER_ON]
+gcode:
+  {action_call_remote_method(
+    "set_device_power", device="tasmota_ender_3_V2", state="on"
+  )}
+
+###########################################################
+##              Dual extruder Single Nozzle 
+###########################################################
+
+[gcode_macro T0]
+gcode:
+    # Deactivate stepper in my_extruder_stepper
+    SYNC_EXTRUDER_MOTION EXTRUDER=extruder1 MOTION_QUEUE=
+    # Activate stepper in extruder
+    SYNC_EXTRUDER_MOTION EXTRUDER=extruder MOTION_QUEUE=extruder
+    SET_GCODE_VARIABLE MACRO=ACTIVATE_EXTRUDER VARIABLE=active_extruder VALUE="'T0'"
+
+[gcode_macro T1]
+gcode:
+    SYNC_EXTRUDER_MOTION EXTRUDER=extruder MOTION_QUEUE=
+    # Activate stepper in my_extruder_stepper
+    SYNC_EXTRUDER_MOTION EXTRUDER=extruder1 MOTION_QUEUE=extruder
+    SET_GCODE_VARIABLE MACRO=ACTIVATE_EXTRUDER VARIABLE=active_extruder VALUE="'T1'"
+
+
+[gcode_macro ACTIVATE_EXTRUDER]
+description: Replaces built-in macro for a X-in, 1-out extruder configuration SuperSlicer fix
+rename_existing: ACTIVATE_EXTRUDER_BASE
+variable_active_extruder: ""
+gcode:
+      {% if 'EXTRUDER' in params %}
+      {% set extruder = params.EXTRUDER|default(EXTRUDER) %}
+      {% if extruder == "extruder"%}
+        {action_respond_info("Switching to extruder0 / T0")}
+        T0
+      {% elif extruder == "extruder1" %}
+        {action_respond_info("Switching to extruder1 / T1")}
+        T1
+      {% else %}
+        #{action_respond_info("EXTRUDER value being passed.")}
+        #ACTIVATE_EXTRUDER_BASE EXTRUDER={ext}
+        RESPOND TYPE=error MSG="-----CRITICAL: Unknown extruder set-----"
+        {% if printer.idle_timeout.state == "Printing" %}
+          CANCEL_Print
+        {% else %}
+          M112
+        {% endif %}
+      {% endif %}
+    {% endif %}
+
+[delayed_gcode ACTIVATE_DEFAULT_EXTRUDER]
+initial_duration: 1
+gcode:
+    ACTIVATE_EXTRUDER EXTRUDER=extruder
+
+[gcode_macro SWAP_FILAMENT_NO_PROMPT]
+gcode:
+    {% if printer[printer.toolhead.extruder].target > 200 and printer[printer.toolhead.extruder].target < 260 %}
+      RESPOND MSG="Heating to target temp"
+      M109 S{printer[printer.toolhead.extruder].target}
+    {% else %}
+      RESPOND MSG="Heating to 220 degrees C"
+      M109 S220
+    {% endif %}
+    RESPOND MSG="Retracting"
+    SAVE_GCODE_STATE NAME=swap_filament1
+    M83
+    G1 E2 F1800
+    G1 E-50 F2400
+    G1 E-85 F3200
+    RESTORE_GCODE_STATE NAME=swap_filament1
+    {% if printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+      T1
+    {% elif printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+      T0
+    {% else %}
+      RESPOND TYPE=error MSG="-----CRITICAL: Unknown active extruder-----"
+      {% if printer.idle_timeout.state == "Printing" %}
+        CANCEL_Print
+      {% else %}
+        M112
+      {% endif %}
+    {% endif %}
+    RESPOND MSG="Priming"
+    SAVE_GCODE_STATE NAME=swap_filament2
+    M83
+    G1 E30 F2400
+    G1 E70 F3200
+    G1 E10 F2400
+    G1 E60 F900
+    RESTORE_GCODE_STATE NAME=swap_filament2
+    RESPOND MSG="Swap Filament complete"
+    
+[gcode_macro SWAP_FILAMENT]
+gcode:  
+    RESPOND TYPE=command MSG="action:prompt_begin Confirmation"
+    RESPOND TYPE=command MSG="action:prompt_text ---CHECK IF CORRECT MOTOR FOR FILAMENT AT NOZZLE IS SET---"
+    RESPOND TYPE=command MSG="action:prompt_footer_button continue|SWAP_FILAMENT_MC"
+    RESPOND TYPE=command MSG="action:prompt_footer_button CANCEL|RESPOND TYPE=command MSG=action:prompt_end|error"
+    RESPOND TYPE=command MSG="action:prompt_show"
+    { action_respond_info("The currently active extruder is: " + printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder|string )}
+    
+[gcode_macro SWAP_FILAMENT_MC]
+gcode:
+    RESPOND TYPE=command MSG=action:prompt_end
+    {% if printer[printer.toolhead.extruder].target > 200 and printer[printer.toolhead.extruder].target < 260 %}
+      RESPOND MSG="Heating to target temp"
+      M109 S{printer[printer.toolhead.extruder].target}
+    {% else %}
+      RESPOND MSG="Heating to 220 degrees C"
+      M109 S220
+    {% endif %}
+    RESPOND MSG="Retracting"
+    SAVE_GCODE_STATE NAME=swap_filament1
+    M83
+    G1 E2 F1800
+    G1 E-50 F2400
+    G1 E-85 F3200
+    RESTORE_GCODE_STATE NAME=swap_filament1
+    {% if printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T0" %}
+      T1
+    {% elif printer["gcode_macro ACTIVATE_EXTRUDER"].active_extruder == "T1" %}
+      T0
+    {% else %}
+      RESPOND TYPE=error MSG="-----CRITICAL: Unknown active extruder-----"
+      {% if printer.idle_timeout.state == "Printing" %}
+        CANCEL_Print
+      {% else %}
+        M112
+      {% endif %}
+    {% endif %}
+    RESPOND MSG="Priming"
+    SAVE_GCODE_STATE NAME=swap_filament2
+    M83
+    G1 E30 F2400
+    G1 E70 F3200
+    G1 E10 F2400
+    G1 E60 F900
+    RESTORE_GCODE_STATE NAME=swap_filament2
+    RESPOND MSG="Swap Filament complete"
+
+###########################################################
+##                       Timeout 
+###########################################################
+
+[gcode_macro IDLE_TIMEOUT]
+description: Set idle timeout in seconds.
+gcode:
+    {% set IDLE_TIMEOUT = params.IDLE_TIMEOUT|default(1800)|float %}
+    SET_IDLE_TIMEOUT TIMEOUT={IDLE_TIMEOUT}
+    #{ action_respond_info("Idle timeout set to " + IDLE_TIMEOUT|string )}
+
+###########################################################
+##              Modified Mainsail macros 
+###########################################################
+
+[gcode_macro USER_PAUSE_ACTIONS]
+gcode:
+  {% set current_fan_speed = printer['fan'].fan_speed %}
+  SET_GCODE_VARIABLE MACRO=PAUSE VARIABLE=pause_fan_speed VALUE={current_fan_speed}
+  M84 S3600
+  M106 S0
+
+[gcode_macro USER_RESUME_ACTIONS]
+gcode:
+  {% set previous_fan_speed = printer['gcode_macro'].get_variable('PAUSE', 'pause_fan_speed') %}
+  SET_FAN_SPEED FAN=fan SPEED={previous_fan_speed}
+
+[gcode_macro CANCEL_PRINT]
+description: Cancel the actual running print
+rename_existing: CANCEL_PRINT_BASE
+gcode:
+  ##### get user parameters or use default #####
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set allow_park = client.park_at_cancel|default(false)|lower == 'true' %}
+  {% set retract = client.cancel_retract|default(5.0)|abs %}
+  ##### define park position #####
+  {% set park_x = "" if (client.park_at_cancel_x|default(none) is none)
+            else "X=" ~ client.park_at_cancel_x %}
+  {% set park_y = "" if (client.park_at_cancel_y|default(none) is none)
+            else "Y=" ~ client.park_at_cancel_y %}
+  {% set custom_park = park_x|length > 0 or park_y|length > 0 %}
+  ##### end of definitions #####
+  # restore idle_timeout time if needed
+  {% if printer['gcode_macro RESUME'].restore_idle_timeout > 0 %}
+    SET_IDLE_TIMEOUT TIMEOUT={printer['gcode_macro RESUME'].restore_idle_timeout}
+  {% endif %}
+  {% if (custom_park or not printer.pause_resume.is_paused) and allow_park %} _TOOLHEAD_PARK_PAUSE_CANCEL {park_x} {park_y} {% endif %}
+  _CLIENT_RETRACT LENGTH={retract}
+  TURN_OFF_HEATERS
+  M106 S0
+  {client.user_cancel_macro|default("")}
+  SET_GCODE_VARIABLE MACRO=RESUME VARIABLE=idle_state VALUE=False
+  # clear pause_next_layer and pause_at_layer as preparation for next print
+  SET_PAUSE_NEXT_LAYER ENABLE=0
+  SET_PAUSE_AT_LAYER ENABLE=0 LAYER=0
+  CANCEL_PRINT_BASE
+
+[gcode_macro PAUSE]
+description: Pause the actual running print
+rename_existing: PAUSE_BASE
+gcode:
+  ##### get user parameters or use default ##### 
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set idle_timeout = client.idle_timeout|default(0) %}
+  {% set temp = printer[printer.toolhead.extruder].target if printer.toolhead.extruder != '' else 0 %}
+  {% set restore = False if printer.toolhead.extruder == ''
+              else True  if params.RESTORE|default(1)|int == 1 else False %}
+  ##### end of definitions #####
+  SET_GCODE_VARIABLE MACRO=RESUME VARIABLE=last_extruder_temp VALUE="{{'restore': restore, 'temp': temp}}"
+  # set a new idle_timeout value
+  {% if idle_timeout > 0 %}
+    SET_GCODE_VARIABLE MACRO=RESUME VARIABLE=restore_idle_timeout VALUE={printer.configfile.settings.idle_timeout.timeout}
+    SET_IDLE_TIMEOUT TIMEOUT={idle_timeout}
+  {% endif %}
+  PAUSE_BASE
+  {client.user_pause_macro|default("")}
+  _TOOLHEAD_PARK_PAUSE_CANCEL {rawparams}
+
+[gcode_macro RESUME]
+description: Resume the actual running print
+rename_existing: RESUME_BASE
+variable_last_extruder_temp: {'restore': False, 'temp': 0}
+variable_restore_idle_timeout: 0
+variable_idle_state: False
+gcode:
+  ##### get user parameters or use default #####
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set velocity = printer.configfile.settings.pause_resume.recover_velocity %}
+  {% set sp_move = client.speed_move|default(velocity) %}
+  {% set runout_resume = True if client.runout_sensor|default("") == ""     # no runout
+                    else True if not printer[client.runout_sensor].enabled  # sensor is disabled
+                    else printer[client.runout_sensor].filament_detected %} # sensor status
+  {% set can_extrude = True if printer.toolhead.extruder == ''           # no extruder defined in config
+                  else printer[printer.toolhead.extruder].can_extrude %} # status of active extruder
+  {% set do_resume = False %}
+  {% set prompt_txt = [] %}
+  ##### end of definitions #####
+  #### Printer comming from timeout idle state ####
+  {% if printer.idle_timeout.state|upper == "IDLE" or idle_state %}
+    SET_GCODE_VARIABLE MACRO=RESUME VARIABLE=idle_state VALUE=False
+    {% if last_extruder_temp.restore %}
+      # we need to use the unicode (\u00B0) for the ° as py2 env's would throw an error otherwise 
+      RESPOND TYPE=echo MSG='{"Restoring \"%s\" temperature to %3.1f\u00B0C, this may take some time" % (printer.toolhead.extruder, last_extruder_temp.temp) }'
+      M109 S{last_extruder_temp.temp}
+      {% set do_resume = True %}
+    {% elif can_extrude %}
+      {% set do_resume = True %}
+    {% else %} 
+      RESPOND TYPE=error MSG='{"Resume aborted !!! \"%s\" not hot enough, please heat up again and press RESUME" % printer.toolhead.extruder}'
+      {% set _d = prompt_txt.append("\"%s\" not hot enough, please heat up again and press RESUME" % printer.toolhead.extruder) %}
+    {% endif %}
+  #### Printer comming out of regular PAUSE state ####
+  {% elif can_extrude %}
+    {% set do_resume = True %}
+  {% else %}
+    RESPOND TYPE=error MSG='{"Resume aborted !!! \"%s\" not hot enough, please heat up again and press RESUME" % printer.toolhead.extruder}'
+    {% set _d = prompt_txt.append("\"%s\" not hot enough, please heat up again and press RESUME" % printer.toolhead.extruder) %}
+  {% endif %}
+  {% if runout_resume %}
+    {% if do_resume %}
+      {% if restore_idle_timeout > 0 %} SET_IDLE_TIMEOUT TIMEOUT={restore_idle_timeout} {% endif %} # restore idle_timeout time
+      {client.user_resume_macro|default("")}
+      _CLIENT_EXTRUDE
+      RESUME_BASE VELOCITY={params.VELOCITY|default(sp_move)}
+    {% endif %}
+  {% else %}
+    RESPOND TYPE=error MSG='{"Resume aborted !!! \"%s\" detects no filament, please load filament and press RESUME" % (client.runout_sensor.split(" "))[1]}'
+    {% set _d = prompt_txt.append("\"%s\" detects no filament, please load filament and press RESUME" % (client.runout_sensor.split(" "))[1]) %}
+  {% endif %}
+  ##### Generate User Information box in case of abort #####
+  {% if not (runout_resume and do_resume) %} 
+    RESPOND TYPE=command MSG="action:prompt_begin RESUME aborted !!!"
+    {% for element in prompt_txt %}
+      RESPOND TYPE=command MSG='{"action:prompt_text %s" % element}' 
+    {% endfor %}
+    RESPOND TYPE=command MSG="action:prompt_footer_button Ok|RESPOND TYPE=command MSG=action:prompt_end|info"
+    RESPOND TYPE=command MSG="action:prompt_show"
+  {% endif %}
+  
+# Usage: SET_PAUSE_NEXT_LAYER [ENABLE=[0|1]] [MACRO=<name>]
+[gcode_macro SET_PAUSE_NEXT_LAYER]
+description: Enable a pause if the next layer is reached
+gcode:
+  {% set pause_next_layer = printer['gcode_macro SET_PRINT_STATS_INFO'].pause_next_layer %}
+  {% set ENABLE = params.ENABLE|default(1)|int != 0 %}
+  {% set MACRO = params.MACRO|default(pause_next_layer.call, True) %}
+  SET_GCODE_VARIABLE MACRO=SET_PRINT_STATS_INFO VARIABLE=pause_next_layer VALUE="{{ 'enable': ENABLE, 'call': MACRO }}"
+
+# Usage: SET_PAUSE_AT_LAYER [ENABLE=[0|1]] [LAYER=<number>] [MACRO=<name>]
+[gcode_macro SET_PAUSE_AT_LAYER]
+description: Enable/disable a pause if a given layer number is reached
+gcode:
+  {% set pause_at_layer = printer['gcode_macro SET_PRINT_STATS_INFO'].pause_at_layer %}
+  {% set ENABLE = params.ENABLE|int != 0 if params.ENABLE is defined
+             else params.LAYER is defined %}
+  {% set LAYER = params.LAYER|default(pause_at_layer.layer)|int %}
+  {% set MACRO = params.MACRO|default(pause_at_layer.call, True) %}
+  SET_GCODE_VARIABLE MACRO=SET_PRINT_STATS_INFO VARIABLE=pause_at_layer VALUE="{{ 'enable': ENABLE, 'layer': LAYER, 'call': MACRO }}"
+
+# Usage: SET_PRINT_STATS_INFO [TOTAL_LAYER=<total_layer_count>] [CURRENT_LAYER= <current_layer>]
+[gcode_macro SET_PRINT_STATS_INFO]
+rename_existing: SET_PRINT_STATS_INFO_BASE
+description: Overwrite, to get pause_next_layer and pause_at_layer feature
+variable_pause_next_layer: { 'enable': False, 'call': "PAUSE" }
+variable_pause_at_layer  : { 'enable': False, 'layer': 0, 'call': "PAUSE" }
+gcode:
+  {% if pause_next_layer.enable %}
+    RESPOND TYPE=echo MSG='{"%s, forced by pause_next_layer" % pause_next_layer.call}'
+    {pause_next_layer.call} ; execute the given gcode to pause, should be either M600 or PAUSE
+    SET_PAUSE_NEXT_LAYER ENABLE=0
+  {% elif pause_at_layer.enable and params.CURRENT_LAYER is defined and params.CURRENT_LAYER|int == pause_at_layer.layer %}
+    RESPOND TYPE=echo MSG='{"%s, forced by pause_at_layer [%d]" % (pause_at_layer.call, pause_at_layer.layer)}'
+    {pause_at_layer.call} ; execute the given gcode to pause, should be either M600 or PAUSE
+    SET_PAUSE_AT_LAYER ENABLE=0
+  {% endif %}
+  SET_PRINT_STATS_INFO_BASE {rawparams}
+  
+##### internal use #####
+[gcode_macro _TOOLHEAD_PARK_PAUSE_CANCEL]
+description: Helper: park toolhead used in PAUSE and CANCEL_PRINT
+gcode:
+  ##### get user parameters or use default #####
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set velocity = printer.configfile.settings.pause_resume.recover_velocity %}
+  {% set use_custom     = client.use_custom_pos|default(false)|lower == 'true' %}
+  {% set custom_park_x  = client.custom_park_x|default(0.0) %}
+  {% set custom_park_y  = client.custom_park_y|default(0.0) %}
+  {% set park_dz        = client.custom_park_dz|default(2.0)|abs %}
+  {% set sp_hop         = client.speed_hop|default(15) * 60 %}
+  {% set sp_move        = client.speed_move|default(velocity) * 60 %}
+  ##### get config and toolhead values #####
+  {% set origin    = printer.gcode_move.homing_origin %}
+  {% set act       = printer.gcode_move.gcode_position %}
+  {% set max       = printer.toolhead.axis_maximum %}
+  {% set cone      = printer.toolhead.cone_start_z|default(max.z) %} ; height as long the toolhead can reach max and min of an delta
+  {% set round_bed = True if printer.configfile.settings.printer.kinematics is in ['delta','polar','rotary_delta','winch']
+                else False %}
+  ##### define park position #####
+  {% set z_min = params.Z_MIN|default(0)|float %}
+  {% set z_park = [[(act.z + park_dz), z_min]|max, (max.z - origin.z)]|min %}
+  {% set x_park = params.X       if params.X is defined
+             else custom_park_x  if use_custom
+             else 0.0            if round_bed
+             else (max.x - 5.0) %}
+  {% set y_park = params.Y       if params.Y is defined
+             else custom_park_y  if use_custom
+             else (max.y - 5.0)  if round_bed and z_park < cone
+             else 0.0            if round_bed
+             else (max.y - 5.0) %}
+  ##### end of definitions #####
+  _CLIENT_RETRACT
+  {% if "xyz" in printer.toolhead.homed_axes %}
+    G90
+    G1 Z{z_park} F{sp_hop}
+    G1 X{x_park} Y{y_park} F{sp_move}
+    {% if not printer.gcode_move.absolute_coordinates %} G91 {% endif %}
+  {% else %}
+    RESPOND TYPE=echo MSG='Printer not homed'
+  {% endif %}
+  
+[gcode_macro _CLIENT_EXTRUDE]
+description: Extrudes, if the extruder is hot enough
+gcode:
+  ##### get user parameters or use default #####
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set use_fw_retract = (client.use_fw_retract|default(false)|lower == 'true') and (printer.firmware_retraction is defined) %}
+  {% set length = params.LENGTH|default(client.unretract)|default(1.0)|float %}
+  {% set speed = params.SPEED|default(client.speed_unretract)|default(35) %}
+  {% set absolute_extrude = printer.gcode_move.absolute_extrude %}
+  ##### end of definitions #####
+  {% if printer.toolhead.extruder != '' %}
+    {% if printer[printer.toolhead.extruder].can_extrude %}
+      {% if use_fw_retract %}
+        {% if length < 0 %}
+          G10
+        {% else %}
+          G11
+        {% endif %}
+      {% else %}
+        M83
+        G1 E{length} F{(speed|float|abs) * 60}
+        {% if absolute_extrude %}
+          M82
+        {% endif %}
+      {% endif %}
+    {% else %}
+      RESPOND TYPE=echo MSG='{"\"%s\" not hot enough" % printer.toolhead.extruder}'
+    {% endif %}
+  {% endif %}
+
+[gcode_macro _CLIENT_RETRACT]
+description: Retracts, if the extruder is hot enough
+gcode:
+  {% set client = printer['gcode_macro _CLIENT_VARIABLE']|default({}) %}
+  {% set length = params.LENGTH|default(client.retract)|default(1.0)|float %}
+  {% set speed = params.SPEED|default(client.speed_retract)|default(35) %}
+
+  _CLIENT_EXTRUDE LENGTH=-{length|float|abs} SPEED={speed|float|abs}
+
+###########################################################
+##                   Get Variables
+###########################################################
+
+[gcode_macro GET_VARIABLE]
+gcode:
+    {% set names = (params.NAME).split('.')|list %}
+    {% set join = (params.JOIN)|default(1)|int %}
+    
+    {% set _dummy0 = namespace( break = 0 ) %}
+    {% set _dummy1 = namespace( out = printer[names|first] ) %}
+    
+    {% for name in names if _dummy0.break == 0 %}
+        {% if loop.index > 1 %}
+            {% if name in _dummy1.out %}
+                {% set _dummy1.out = _dummy1.out[name] %}
+            {% elif name[0] in '0123456789' and _dummy1.out is iterable and _dummy1.out is not string and _dummy1.out is not mapping and _dummy1.out|length > name[0]|int %}
+                {% set _dummy1.out = _dummy1.out[name|int] %}
+            {% else %}
+                {% set _dummy0.break = loop.index0 %}
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+    
+    {% if _dummy1.out is boolean %}
+        { action_respond_info('Type: boolean') }
+    {% elif _dummy1.out is float %}
+        { action_respond_info('Type: float') }
+    {% elif _dummy1.out is integer %}
+        { action_respond_info('Type: integer') }
+    {% elif _dummy1.out is mapping %}
+        { action_respond_info('Type: mapping') }
+    {% elif _dummy1.out is string %}
+        { action_respond_info('Type: string') }
+    {% elif _dummy1.out is iterable %}
+        { action_respond_info('Type: iterable') }
+    {% elif _dummy1.out is none %}
+        { action_respond_info('Type: none') }
+    {% elif _dummy1.out is undefined %}
+        { action_respond_info('Type: undefined') }
+    {% elif _dummy1.out is callable %}
+        { action_respond_info('Type: callable') }
+    {% else %}
+        { action_respond_info('Type: unknown') }
+    {% endif %}
+    
+    {% if join and _dummy1.out is iterable and _dummy1.out is not string and _dummy1.out is not mapping %}
+        { action_respond_info('%s' % _dummy1.out|join("\n")) }
+    {% else %}
+        { action_respond_info('%s' % _dummy1.out) }
+    {% endif %}
+    
+    {% if _dummy0.break != 0 %}
+        { action_respond_info('"printer.%s" does not contain "%s"!' % (names[0:_dummy0.break]|join('.'), names[_dummy0.break])) }
+    {% endif %}
+
+[gcode_macro DUMP_VARIABLES]
+gcode:
+    {% set filter_name = params.NAME|default('')|string|lower %}
+    {% set filter_value = params.VALUE|default('')|string|lower %}
+    {% set show_cfg = params.SHOW_CFG|default(0)|int %}
+    
+    {% set out = [] %}
+
+    {% for key1 in printer %}
+        {% for key2 in printer[key1] %}
+            {% if (show_cfg or not (key1|lower == 'configfile' and key2|lower in ['config', 'settings'])) and (filter_name in key1|lower or filter_name in key2|lower) and filter_value in printer[key1][key2]|string|lower %}
+                {% set dummy = out.append("printer['%s'].%s = %s" % (key1, key2, printer[key1][key2])) %}
+            {% endif %}
+        {% else %}
+            {% if filter_name in key1|lower and filter_value in printer[key1]|string|lower %}
+                {% set dummy = out.append("printer['%s'] = %s" % (key1, printer[key1])) %}
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+    
+    {action_respond_info(out|join("\n"))}
+
+###########################################################
+##                  Obsolete Macros 
+###########################################################
+
+
+[gcode_macro PARK_OLD]
+description: Park the head to change tool
+gcode:
+    M117 Parking Head...
+    ##### set defaults #####
+    {% set x = params.X|default(-15) %}      #edit to your park position
+    {% set y = params.Y|default(0) %}      #edit to your park position
+    {% set z = params.Z|default(20)|float %} #edit to your park position
+    {% set e = params.E|default(3) %}        #edit to your retract length
+    ##### save current x and y position ####
+    SAVE_GCODE_STATE NAME=park_state
+    ##### calculate save lift position #####
+    {% set max_z = printer.toolhead.axis_maximum.z|float %}
+    {% set act_z = printer.toolhead.position.z|float %}
+    {% set lift_z = z|abs %}
+    {% if act_z < (max_z - lift_z) %}
+        {% set z_safe = lift_z %}
+    {% else %}
+        {% set z_safe = max_z - act_z %}
+    {% endif %}
+    ##### end of definitions #####
+    G91
+    {% if printer.extruder.can_extrude|lower == 'true' %}
+      G1 E-{e} F2100
+    {% else %}
+      {action_respond_info("Extruder not hot enough")}
+    {% endif %}
+    {% if "xyz" in printer.toolhead.homed_axes %}    
+      G1 Z{z_safe}
+      G90
+      G1 X{x} Y{y} F6000
+    {% else %}
+      {action_respond_info("Printer not homed")}
+    {% endif %}
+    M117 Head Parked...
+
+
+[gcode_macro FILAMENT_LOAD_OLD]
+description: Loads filament from splitter to hot end
+gcode =
+	M117 LOADING...
+	G91
+	G1 E140.0 F900
+	G4 P900
+	G1 E20.0 F150
+	G90
+    G4 P3000
+    M117
+
+[gcode_macro CONTINUE_OLD]
+description: Continue's printing after tool change
+gcode:
+    M117 Print Continuing...
+    ##### set defaults #####
+    {% set speed = params.SPEED|default(120) %}
+    ##### end of definitions #####
+    RESTORE_GCODE_STATE NAME=park_state MOVE=1 MOVE_SPEED={speed}
+    M117
